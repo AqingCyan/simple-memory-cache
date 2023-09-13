@@ -7,7 +7,7 @@
 ```go
 type Cache interface {
 	// size: 缓存大小限制，1kb 100kb 1mb 2mb 1gb
-	SetMaxSize(size string) error
+	SetMaxSize(size string) bool
 	
 	// 将 value 写入缓存
 	Set(key string, value interface{}, expire time.Duration) bool
@@ -32,7 +32,7 @@ type Cache interface {
 使用示例
 
 ```go
-cache := NewCache()
+cache := NewMemCache()
 
 cache.SetMaxSize("10mb")
 
