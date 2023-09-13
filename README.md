@@ -39,11 +39,11 @@ cache.SetMaxSize("10mb")
 cache.Set("int", 1)
 cache.Set("string", "hello")
 cache.Set("struct", struct {
-    Name string
-    Age  int
+	Name string
+	Age  int
 }{
-    Name: "test",
-    Age:  18,
+	Name: "test", 
+	Age:  18,
 })
 cache.Set("expire", "expire", time.Second*2)
 
