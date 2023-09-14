@@ -1,4 +1,4 @@
-package cache
+package simpleCache
 
 import (
 	"log"
@@ -26,7 +26,7 @@ func ParseSize(size string) (int64, string) {
 	var byteNum int64 = 0
 	switch unit {
 	case "B":
-		byteNum = num
+		byteNum = num * B
 		break
 	case "KB":
 		byteNum = num * KB

@@ -1,12 +1,12 @@
 package main
 
 import (
-	"SimpleMemeCache/cache"
+	"SimpleMemeCache/simpleCache"
 	"time"
 )
 
 func main() {
-	memCache := cache.NewMemCache()
+	memCache := simpleCache.NewMemCache()
 
 	memCache.SetMaxSize("300mb")
 

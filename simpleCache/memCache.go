@@ -1,4 +1,4 @@
-package cache
+package simpleCache
 
 import (
 	"fmt"
@@ -24,27 +24,51 @@ func NewMemCache() Cache {
 	return &memCache{}
 }
 
+func (mc *memCache) add(key string, val *memCacheValue) {
+	mc.values[key] = val
+	mc.currentMemorySize += val.size
+}
+
+func (mc *memCache) del(key string) {
+	tmp, ok := mc.get(key)
+	if ok && tmp != nil {
+		mc.currentMemorySize -= tmp.size
+		delete(mc.values, key)
+	}
+}
+
+func (mc *memCache) get(key string) (*memCacheValue, bool) {
+	val, ok := mc.values[key]
+	return val, ok
+}
+
 func (mc *memCache) SetMaxSize(size string) bool {
 	mc.maxMemorySize, mc.maxMemorySizeStr = ParseSize(size)
 
 	fmt.Println(mc.maxMemorySize, mc.maxMemorySizeStr)
 
-	return false
+	return true
 }
 
 func (mc *memCache) Set(key string, value interface{}, expire time.Duration) bool {
+	mc.locker.Lock()
 	defer mc.locker.Unlock()
+
 	v := &memCacheValue{
 		value:  value,
 		expire: time.Now().Add(expire),
 		size:   GetValueSize(value),
 	}
 
-	mc.locker.Lock()
+	mc.del(key)
+	mc.add(key, v)
 
-	mc.values[key] = v
+	if mc.currentMemorySize > mc.maxMemorySize {
+		mc.del(key)
+		panic(fmt.Sprintf("memCache: simpleCache size is over max size: %s", mc.maxMemorySizeStr))
+	}
 
-	return false
+	return true
 }
 
 func (mc *memCache) Get(key string) (interface{}, bool) {
