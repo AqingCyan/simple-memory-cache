@@ -58,3 +58,9 @@ func ParseSize(size string) (int64, string) {
 
 	return byteNum, sizeStr
 }
+
+// GetValueSize 获取 value 的大小
+func GetValueSize(val interface{}) int64 {
+	//TODO implement me
+	return 0
+}
