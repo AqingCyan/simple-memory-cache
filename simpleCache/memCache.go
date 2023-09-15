@@ -2,6 +2,7 @@ package simpleCache
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -24,11 +25,13 @@ func NewMemCache() Cache {
 	return &memCache{}
 }
 
+// add 小粒度操作，添加缓存，如果缓存已存在，则覆盖，并计算当前值所占内存大小
 func (mc *memCache) add(key string, val *memCacheValue) {
 	mc.values[key] = val
 	mc.currentMemorySize += val.size
 }
 
+// del 小粒度操作，删除缓存，并重新计算当前值所占内存大小
 func (mc *memCache) del(key string) {
 	tmp, ok := mc.get(key)
 	if ok && tmp != nil {
@@ -37,6 +40,7 @@ func (mc *memCache) del(key string) {
 	}
 }
 
+// get 小粒度操作，获取缓存
 func (mc *memCache) get(key string) (*memCacheValue, bool) {
 	val, ok := mc.values[key]
 	return val, ok
@@ -60,38 +64,65 @@ func (mc *memCache) Set(key string, value interface{}, expire time.Duration) boo
 		size:   GetValueSize(value),
 	}
 
+	// 在设置新值之前，先删除旧值，是为了保证每次操作能计算内存大小的准确性，因为如果是同名的 key，那么直接修改旧值的内存大小是不会被计算的，因此，我们把操作拆分为更小的粒度。
 	mc.del(key)
 	mc.add(key, v)
 
 	if mc.currentMemorySize > mc.maxMemorySize {
 		mc.del(key)
-		panic(fmt.Sprintf("memCache: simpleCache size is over max size: %s", mc.maxMemorySizeStr))
+		log.Println(fmt.Sprintf("memCache: simpleCache size is over max size: %s", mc.maxMemorySizeStr))
 	}
 
 	return true
 }
 
 func (mc *memCache) Get(key string) (interface{}, bool) {
-	//TODO implement me
+	mc.locker.RLock()
+	defer mc.locker.RUnlock()
+
+	mcVal, ok := mc.get(key)
+	if ok {
+		if mcVal.expire.Before(time.Now()) {
+			mc.del(key)
+			return nil, false
+		}
+		return mcVal.value, true
+	}
+
 	return nil, false
 }
 
 func (mc *memCache) Del(key string) bool {
-	//TODO implement me
+	mc.locker.Lock()
+	defer mc.locker.Unlock()
+
+	mc.del(key)
+
 	return false
 }
 
 func (mc *memCache) Exists(key string) bool {
-	//TODO implement me
-	return false
+	mc.locker.RLock()
+	defer mc.locker.RUnlock()
+
+	_, ok := mc.get(key)
+
+	return ok
 }
 
 func (mc *memCache) Flush() bool {
-	//TODO implement me
-	return false
+	mc.locker.Lock()
+	defer mc.locker.Unlock()
+
+	mc.values = make(map[string]*memCacheValue)
+	mc.currentMemorySize = 0
+
+	return true
 }
 
 func (mc *memCache) Keys() int64 {
-	//TODO implement me
-	return 0
+	mc.locker.RLock()
+	defer mc.locker.RUnlock()
+
+	return int64(len(mc.values))
 }
