@@ -8,21 +8,30 @@ import (
 )
 
 type memCacheValue struct {
-	value  interface{}
-	expire time.Time
-	size   int64
+	value      interface{}
+	expireTime time.Time
+	expire     time.Duration
+	size       int64
 }
 
 type memCache struct {
-	maxMemorySize     int64
-	maxMemorySizeStr  string
-	currentMemorySize int64
-	values            map[string]*memCacheValue
-	locker            sync.RWMutex
+	maxMemorySize            int64
+	maxMemorySizeStr         string
+	currentMemorySize        int64
+	values                   map[string]*memCacheValue
+	clearExpiredTimeInterval time.Duration
+	locker                   sync.RWMutex
 }
 
 func NewMemCache() Cache {
-	return &memCache{}
+	mc := &memCache{
+		values:                   make(map[string]*memCacheValue),
+		clearExpiredTimeInterval: time.Second,
+	}
+
+	go mc.cleanExpiredItem()
+
+	return mc
 }
 
 // add 小粒度操作，添加缓存，如果缓存已存在，则覆盖，并计算当前值所占内存大小
@@ -59,9 +68,10 @@ func (mc *memCache) Set(key string, value interface{}, expire time.Duration) boo
 	defer mc.locker.Unlock()
 
 	v := &memCacheValue{
-		value:  value,
-		expire: time.Now().Add(expire),
-		size:   GetValueSize(value),
+		value:      value,
+		expireTime: time.Now().Add(expire),
+		expire:     expire,
+		size:       GetValueSize(value),
 	}
 
 	// 在设置新值之前，先删除旧值，是为了保证每次操作能计算内存大小的准确性，因为如果是同名的 key，那么直接修改旧值的内存大小是不会被计算的，因此，我们把操作拆分为更小的粒度。
@@ -82,7 +92,7 @@ func (mc *memCache) Get(key string) (interface{}, bool) {
 
 	mcVal, ok := mc.get(key)
 	if ok {
-		if mcVal.expire.Before(time.Now()) {
+		if mcVal.expire != 0 && mcVal.expireTime.Before(time.Now()) {
 			mc.del(key)
 			return nil, false
 		}
@@ -125,4 +135,23 @@ func (mc *memCache) Keys() int64 {
 	defer mc.locker.RUnlock()
 
 	return int64(len(mc.values))
+}
+
+// cleanExpiredItem 定期清除过期的缓存
+func (mc *memCache) cleanExpiredItem() {
+	timeTicker := time.NewTicker(mc.clearExpiredTimeInterval)
+	defer timeTicker.Stop()
+
+	for {
+		select {
+		case <-timeTicker.C:
+			for key, item := range mc.values {
+				if item.expire != 0 && item.expireTime.Before(time.Now()) {
+					mc.locker.Lock()
+					mc.del(key)
+					mc.locker.Unlock()
+				}
+			}
+		}
+	}
 }
