@@ -26,7 +26,7 @@ func main() {
 
 	memCache.Set("expire", "expire", time.Second*2)
 
-	memCache.Flush()
-
 	memCache.Keys()
+
+	memCache.Flush()
 }

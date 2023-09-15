@@ -1,6 +1,8 @@
 package simpleCache
 
 import (
+	"bytes"
+	"encoding/binary"
 	"log"
 	"regexp"
 	"strconv"
@@ -59,8 +61,17 @@ func ParseSize(size string) (int64, string) {
 	return byteNum, sizeStr
 }
 
-// GetValueSize 获取 value 的大小
+/*
+GetValueSize 获取 value 的大小。
+PS：不使用 unsafe.Sizeof(val) 的原因是，我们存储数据使用的是 map， 因此，使用它获取 val 的 size ，实际上获取的是 val 的指针大小，而不是 val 的实际大小，因此，我们需要自己实现一个获取 value 大小的方法。
+*/
 func GetValueSize(val interface{}) int64 {
-	//TODO implement me
-	return 0
+	var buf bytes.Buffer
+	err := binary.Write(&buf, binary.LittleEndian, val)
+	if err != nil {
+		log.Println("GetValueSize err: ", err)
+		return 0
+	}
+	return int64(len(buf.Bytes()))
+
 }
